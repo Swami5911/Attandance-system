@@ -1,30 +1,27 @@
 const supabaseUrl = 'https://ggwhosmpsvxrqogwsisq.supabase.co';
 const supabaseKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imdnd2hvc21wc3Z4cnFvZ3dzaXNxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzQ1OTIxODIsImV4cCI6MjA5MDE2ODE4Mn0.7HCRVIyVW0LJd_UMDXyGVuHohNwt59i81DWXljmoFPw';
-const supabase = window.supabase.createClient(supabaseUrl, supabaseKey);
+// Renamed to supabaseClient to avoid conflicting with the global 'supabase' object from the CDN!
+const supabaseClient = window.supabase.createClient(supabaseUrl, supabaseKey);
 
 document.addEventListener('DOMContentLoaded', () => {
     // DOM Elements
     const navItems = document.querySelectorAll('.nav-item');
     const viewSections = document.querySelectorAll('.view-section');
     
-    // Dashboard Elements
     const yearSelect = document.getElementById('year-select');
     const dateSelect = document.getElementById('date-select');
     const loadStudentsBtn = document.getElementById('load-students-btn');
     const attendanceWorkspace = document.getElementById('attendance-workspace');
     const studentsListBody = document.getElementById('students-list');
     
-    // Stats
     const totalCountEl = document.getElementById('total-count');
     const presentCountEl = document.getElementById('present-count');
     const absentCountEl = document.getElementById('absent-count');
     
-    // Actions
     const markAllPresentBtn = document.getElementById('mark-all-present');
     const markAllAbsentBtn = document.getElementById('mark-all-absent');
     const saveAttendanceBtn = document.getElementById('save-attendance-btn');
     
-    // History Elements
     const historyYearSelect = document.getElementById('history-year');
     const historyDateSelect = document.getElementById('history-date');
     const viewHistoryBtn = document.getElementById('view-history-btn');
@@ -32,7 +29,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const noHistoryMsg = document.getElementById('no-history-msg');
     const historyListBody = document.getElementById('history-list');
 
-    // Set today's date as default
+    // Set today's date as default (This proves the script runs if it sets visually!)
     const today = new Date().toISOString().split('T')[0];
     dateSelect.value = today;
     historyDateSelect.value = today;
@@ -73,7 +70,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
         try {
             // Fetch students from Supabase
-            const { data: students, error: stdErr } = await supabase
+            const { data: students, error: stdErr } = await supabaseClient
                 .from('students')
                 .select('*')
                 .eq('year', year)
@@ -85,8 +82,8 @@ document.addEventListener('DOMContentLoaded', () => {
                 return;
             }
             
-            // Fetch potential existing attendance for today from Supabase
-            const { data: existingData, error: attErr } = await supabase
+            // Fetch existing attendance for today
+            const { data: existingData, error: attErr } = await supabaseClient
                 .from('attendance')
                 .select('*')
                 .eq('year', year)
@@ -94,7 +91,6 @@ document.addEventListener('DOMContentLoaded', () => {
                 
             if (attErr) throw attErr;
 
-            // Update Title
             const yearText = yearSelect.options[yearSelect.selectedIndex].text;
             document.getElementById('workspace-title').textContent = `${yearText} Students`;
             studentsListBody.innerHTML = '';
@@ -127,7 +123,6 @@ document.addEventListener('DOMContentLoaded', () => {
                 studentsListBody.appendChild(tr);
             });
 
-            // Add event listeners to toggles
             const checkboxes = document.querySelectorAll('.status-checkbox');
             checkboxes.forEach(box => {
                 box.addEventListener('change', (e) => {
@@ -167,7 +162,6 @@ document.addEventListener('DOMContentLoaded', () => {
         absentCountEl.textContent = total - present;
     }
 
-    // Bulk Actions
     markAllPresentBtn.addEventListener('click', () => {
         const checkboxes = document.querySelectorAll('.status-checkbox');
         checkboxes.forEach(box => {
@@ -196,14 +190,11 @@ document.addEventListener('DOMContentLoaded', () => {
         updateStats();
     });
 
-    // Save Attendance
     saveAttendanceBtn.addEventListener('click', async () => {
         const checkboxes = document.querySelectorAll('.status-checkbox');
         const year = yearSelect.value;
         const date = dateSelect.value;
         
-        // Since we have a unique constraint on (student_id, date),
-        // upsert works automatically if we provide student_id and date.
         const attendanceRecords = [];
         checkboxes.forEach(box => {
             attendanceRecords.push({
@@ -219,7 +210,7 @@ document.addEventListener('DOMContentLoaded', () => {
             saveAttendanceBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Saving...';
 
             // Use Supabase upsert
-            const { error: upsertErr } = await supabase
+            const { error: upsertErr } = await supabaseClient
                 .from('attendance')
                 .upsert(attendanceRecords, { onConflict: 'student_id, date' });
 
@@ -235,7 +226,6 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     });
 
-    // History Logic
     viewHistoryBtn.addEventListener('click', async () => {
         const year = historyYearSelect.value;
         const date = historyDateSelect.value;
@@ -246,9 +236,7 @@ document.addEventListener('DOMContentLoaded', () => {
         }
 
         try {
-            // Because our attendance table only has student_id, we need to join the students table
-            // In supabase JS: .select(`*, students (name)`)
-            const { data: record, error } = await supabase
+            const { data: record, error } = await supabaseClient
                 .from('attendance')
                 .select(`
                     id,
@@ -271,7 +259,8 @@ document.addEventListener('DOMContentLoaded', () => {
                 
                 record.forEach(studentAttendance => {
                     const isPresent = studentAttendance.present;
-                    const studentName = studentAttendance.students.name;
+                    // Extract name from joined students table
+                    const studentName = studentAttendance.students && studentAttendance.students.name ? studentAttendance.students.name : 'Unknown Student';
                     const studentId = studentAttendance.student_id;
 
                     if(isPresent) presentCount++;
@@ -304,7 +293,6 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     });
 
-    // Toast Notification System
     function showToast(message, type = 'success') {
         const toastContainer = document.getElementById('toast-container');
         const toast = document.createElement('div');
