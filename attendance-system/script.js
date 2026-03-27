@@ -1,3 +1,7 @@
+const supabaseUrl = 'https://ggwhosmpsvxrqogwsisq.supabase.co';
+const supabaseKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imdnd2hvc21wc3Z4cnFvZ3dzaXNxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzQ1OTIxODIsImV4cCI6MjA5MDE2ODE4Mn0.7HCRVIyVW0LJd_UMDXyGVuHohNwt59i81DWXljmoFPw';
+const supabase = window.supabase.createClient(supabaseUrl, supabaseKey);
+
 document.addEventListener('DOMContentLoaded', () => {
     // DOM Elements
     const navItems = document.querySelectorAll('.nav-item');
@@ -68,13 +72,27 @@ document.addEventListener('DOMContentLoaded', () => {
         }
 
         try {
-            // Fetch students from backend
-            const studentsRes = await fetch(`/api/students/${year}`);
-            const students = await studentsRes.json();
+            // Fetch students from Supabase
+            const { data: students, error: stdErr } = await supabase
+                .from('students')
+                .select('*')
+                .eq('year', year)
+                .order('id', { ascending: true });
+                
+            if (stdErr) throw stdErr;
+            if (!students || students.length === 0) {
+                showToast('No students found for this year in database', 'error');
+                return;
+            }
             
-            // Fetch potential existing attendance for today from backend
-            const authRes = await fetch(`/api/attendance/${year}/${date}`);
-            const existingData = await authRes.json();
+            // Fetch potential existing attendance for today from Supabase
+            const { data: existingData, error: attErr } = await supabase
+                .from('attendance')
+                .select('*')
+                .eq('year', year)
+                .eq('date', date);
+                
+            if (attErr) throw attErr;
 
             // Update Title
             const yearText = yearSelect.options[yearSelect.selectedIndex].text;
@@ -83,8 +101,8 @@ document.addEventListener('DOMContentLoaded', () => {
             
             students.forEach(student => {
                 let isPresent = true;
-                if (existingData) {
-                    const record = existingData.find(r => r.id === student.id);
+                if (existingData && existingData.length > 0) {
+                    const record = existingData.find(r => r.student_id === student.id);
                     if(record) isPresent = record.present;
                 }
 
@@ -131,7 +149,7 @@ document.addEventListener('DOMContentLoaded', () => {
             updateStats();
         } catch (error) {
             console.error(error);
-            showToast('Failed to load data from server', 'error');
+            showToast('Failed to load data from Supabase', 'error');
         }
     });
 
@@ -184,31 +202,36 @@ document.addEventListener('DOMContentLoaded', () => {
         const year = yearSelect.value;
         const date = dateSelect.value;
         
-        const attendanceRecord = [];
+        // Since we have a unique constraint on (student_id, date),
+        // upsert works automatically if we provide student_id and date.
+        const attendanceRecords = [];
         checkboxes.forEach(box => {
-            attendanceRecord.push({
-                id: box.getAttribute('data-id'),
-                name: box.getAttribute('data-name'),
+            attendanceRecords.push({
+                student_id: box.getAttribute('data-id'),
+                year: year,
+                date: date,
                 present: box.checked
             });
         });
 
         try {
-            const res = await fetch('/api/attendance', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ year, date, records: attendanceRecord })
-            });
+            saveAttendanceBtn.disabled = true;
+            saveAttendanceBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Saving...';
 
-            const data = await res.json();
-            if (res.ok) {
-                showToast(`Attendance saved successfully for ${date}`, 'success');
-            } else {
-                throw new Error(data.error || 'Server error');
-            }
+            // Use Supabase upsert
+            const { error: upsertErr } = await supabase
+                .from('attendance')
+                .upsert(attendanceRecords, { onConflict: 'student_id, date' });
+
+            if (upsertErr) throw upsertErr;
+
+            showToast(`Attendance saved successfully for ${date}`, 'success');
         } catch (error) {
             console.error(error);
-            showToast('Failed to save attendance', 'error');
+            showToast('Failed to save attendance in Supabase', 'error');
+        } finally {
+            saveAttendanceBtn.disabled = false;
+            saveAttendanceBtn.innerHTML = '<i class="fa-solid fa-cloud-arrow-up"></i> Save Attendance';
         }
     });
 
@@ -223,8 +246,21 @@ document.addEventListener('DOMContentLoaded', () => {
         }
 
         try {
-            const res = await fetch(`/api/attendance/${year}/${date}`);
-            const record = await res.json();
+            // Because our attendance table only has student_id, we need to join the students table
+            // In supabase JS: .select(`*, students (name)`)
+            const { data: record, error } = await supabase
+                .from('attendance')
+                .select(`
+                    id,
+                    student_id,
+                    present,
+                    students ( name )
+                `)
+                .eq('year', year)
+                .eq('date', date)
+                .order('student_id', { ascending: true });
+
+            if (error) throw error;
 
             if(record && record.length > 0) {
                 document.getElementById('history-title-date').textContent = new Date(date).toLocaleDateString();
@@ -233,16 +269,20 @@ document.addEventListener('DOMContentLoaded', () => {
                 let presentCount = 0;
                 historyListBody.innerHTML = '';
                 
-                record.forEach(student => {
-                    if(student.present) presentCount++;
+                record.forEach(studentAttendance => {
+                    const isPresent = studentAttendance.present;
+                    const studentName = studentAttendance.students.name;
+                    const studentId = studentAttendance.student_id;
+
+                    if(isPresent) presentCount++;
                     
                     const tr = document.createElement('tr');
                     tr.innerHTML = `
-                        <td><strong>${student.id}</strong></td>
-                        <td>${student.name}</td>
+                        <td><strong>${studentId}</strong></td>
+                        <td>${studentName}</td>
                         <td>
-                            <span class="status-badge ${student.present ? 'present' : 'absent'}">
-                                ${student.present ? 'Present' : 'Absent'}
+                            <span class="status-badge ${isPresent ? 'present' : 'absent'}">
+                                ${isPresent ? 'Present' : 'Absent'}
                             </span>
                         </td>
                     `;
@@ -260,7 +300,7 @@ document.addEventListener('DOMContentLoaded', () => {
             }
         } catch (error) {
             console.error(error);
-            showToast('Failed to fetch history from server', 'error');
+            showToast('Failed to fetch history from Supabase server', 'error');
         }
     });
 
