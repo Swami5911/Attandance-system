@@ -1,0 +1,193 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Class Attendance System | B.Tech</title>
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <!-- FontAwesome for Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- Styles -->
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div class="app-container">
+        
+        <!-- Sidebar Navigation -->
+        <nav class="sidebar glass-panel">
+            <div class="brand">
+                <div class="logo-icon">
+                    <i class="fa-solid fa-graduation-cap"></i>
+                </div>
+                <h2>SKD Univ<span>.</span></h2>
+                <p>B.Tech Attendance</p>
+            </div>
+
+            <ul class="nav-links">
+                <li class="nav-item active" data-view="dashboard">
+                    <i class="fa-solid fa-chart-pie"></i>
+                    <span>Dashboard</span>
+                </li>
+                <li class="nav-item" data-view="history">
+                    <i class="fa-solid fa-clock-rotate-left"></i>
+                    <span>History</span>
+                </li>
+            </ul>
+
+            <div class="user-profile">
+                <div class="avatar">Admin</div>
+                <div class="info">
+                    <strong>Admin User</strong>
+                    <span>admin@edutrack.edu</span>
+                </div>
+            </div>
+        </nav>
+
+        <!-- Main Content Area -->
+        <main class="main-content">
+            
+            <!-- Dashboard View -->
+            <section id="dashboard-view" class="view-section active">
+                <header class="section-header">
+                    <div>
+                        <h1>Record Attendance</h1>
+                        <p class="subtitle">Select a year and date to mark student attendance.</p>
+                    </div>
+                </header>
+
+                <div class="controls-card glass-panel flex-row">
+                    <div class="input-group">
+                        <label for="year-select"><i class="fa-solid fa-layer-group"></i> B.Tech Year</label>
+                        <select id="year-select" class="custom-select">
+                            <option value="">-- Select Year --</option>
+                            <option value="1">1st Year</option>
+                            <option value="2">2nd Year</option>
+                            <option value="3">3rd Year</option>
+                            <option value="4">4th Year</option>
+                        </select>
+                    </div>
+                    
+                    <div class="input-group">
+                        <label for="date-select"><i class="fa-regular fa-calendar"></i> Date</label>
+                        <input type="date" id="date-select" class="custom-input">
+                    </div>
+                    
+                    <div class="input-group align-bottom">
+                        <button id="load-students-btn" class="btn btn-primary" disabled>
+                            <i class="fa-solid fa-users"></i> Load Students
+                        </button>
+                    </div>
+                </div>
+
+                <div id="attendance-workspace" class="attendance-workspace glass-panel hidden">
+                    <div class="workspace-header">
+                        <div>
+                            <h2 id="workspace-title">2nd Year Students</h2>
+                            <p class="stats"><span id="total-count">0</span> Total • <span id="present-count" class="text-green">0</span> Present • <span id="absent-count" class="text-red">0</span> Absent</p>
+                        </div>
+                        <div class="bulk-actions">
+                            <button id="mark-all-present" class="btn btn-outline-success btn-sm"><i class="fa-solid fa-check-double"></i> All Present</button>
+                            <button id="mark-all-absent" class="btn btn-outline-danger btn-sm"><i class="fa-solid fa-xmark"></i> All Absent</button>
+                        </div>
+                    </div>
+
+                    <div class="table-container">
+                        <table class="students-table">
+                            <thead>
+                                <tr>
+                                    <th>Roll No</th>
+                                    <th>Student Name</th>
+                                    <th>Status</th>
+                                    <th class="text-right">Action</th>
+                                </tr>
+                            </thead>
+                            <tbody id="students-list">
+                                <!-- Student rows injected here -->
+                            </tbody>
+                        </table>
+                    </div>
+
+                    <div class="workspace-footer">
+                        <button id="save-attendance-btn" class="btn btn-primary btn-lg pulse">
+                            <i class="fa-solid fa-cloud-arrow-up"></i> Save Attendance
+                        </button>
+                    </div>
+                </div>
+            </section>
+
+            <!-- History View -->
+            <section id="history-view" class="view-section">
+                <header class="section-header">
+                    <div>
+                        <h1>Attendance History</h1>
+                        <p class="subtitle">View past attendance records and analytics.</p>
+                    </div>
+                </header>
+
+                <div class="controls-card glass-panel flex-row">
+                    <div class="input-group">
+                        <label for="history-year"><i class="fa-solid fa-layer-group"></i> B.Tech Year</label>
+                        <select id="history-year" class="custom-select">
+                            <option value="1">1st Year</option>
+                            <option value="2">2nd Year</option>
+                            <option value="3">3rd Year</option>
+                            <option value="4">4th Year</option>
+                        </select>
+                    </div>
+                    
+                    <div class="input-group">
+                        <label for="history-date"><i class="fa-regular fa-calendar"></i> Date</label>
+                        <input type="date" id="history-date" class="custom-input">
+                    </div>
+                    
+                    <div class="input-group align-bottom">
+                        <button id="view-history-btn" class="btn btn-primary">
+                            <i class="fa-solid fa-magnifying-glass"></i> View Records
+                        </button>
+                    </div>
+                </div>
+                
+                <div id="history-results" class="history-results hidden glass-panel mt-4">
+                    <div class="workspace-header">
+                        <div>
+                            <h2>Record Found: <span id="history-title-date"></span></h2>
+                            <p class="stats">Year: <span id="history-title-year"></span> • Total Present: <span id="history-present-count" class="text-green"></span> • Total Absent: <span id="history-absent-count" class="text-red"></span></p>
+                        </div>
+                    </div>
+                    
+                    <div class="table-container">
+                        <table class="students-table">
+                            <thead>
+                                <tr>
+                                    <th>Roll No</th>
+                                    <th>Student Name</th>
+                                    <th>Status</th>
+                                </tr>
+                            </thead>
+                            <tbody id="history-list">
+                                <!-- History rows injected here -->
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <div id="no-history-msg" class="empty-state hidden glass-panel mt-4">
+                    <i class="fa-regular fa-folder-open empty-icon"></i>
+                    <h3>No Records Found</h3>
+                    <p>There is no attendance data saved for the selected year and date.</p>
+                </div>
+            </section>
+        </main>
+    </div>
+
+    <!-- Notification Toast -->
+    <div id="toast-container"></div>
+
+    <!-- Scripts -->
+    <script src="data.js"></script>
+    <script src="script.js"></script>
+</body>
+</html>
